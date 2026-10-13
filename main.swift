@@ -41,7 +41,11 @@ final class TodoStore: ObservableObject {
 
     var openCount: Int { items.filter { !$0.done }.count }
 
-    func items(in section: Section) -> [TodoItem] { items.filter { $0.section == section } }
+    // Åpne oppgaver først, avkryssede nederst.
+    func items(in section: Section) -> [TodoItem] {
+        let all = items.filter { $0.section == section }
+        return all.filter { !$0.done } + all.filter { $0.done }
+    }
     func openCount(in section: Section) -> Int { items(in: section).filter { !$0.done }.count }
 
     private func modDate() -> Date? {
@@ -97,7 +101,9 @@ final class TodoStore: ObservableObject {
 
     func toggle(_ id: UUID) {
         guard let i = items.firstIndex(where: { $0.id == id }) else { return }
-        items[i].done.toggle()
+        var item = items.remove(at: i)
+        item.done.toggle()
+        items.append(item)  // havner nederst blant åpne eller avkryssede
         save()
     }
 
