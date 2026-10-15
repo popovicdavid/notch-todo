@@ -122,7 +122,7 @@ final class NotchModel: ObservableObject {
 enum Layout {
     static let openSize = CGSize(width: 580, height: 330)
     static let largeSize = CGSize(width: 880, height: 620)
-    static let hoverExtra = CGSize(width: 110, height: 6)
+    static let hoverExtra = CGSize(width: 110, height: 26)  // 6 rundt notchen + 20 til klokka
 }
 
 struct NotchView: View {
@@ -177,15 +177,21 @@ struct NotchView: View {
 
     // Viktige til venstre, generelle til høyre – på hver sin side av kameraet.
     private var hoverContent: some View {
-        HStack {
-            Label("\(store.openCount(in: .viktig))", systemImage: "exclamationmark.circle")
-            Spacer()
-            Label("\(store.openCount(in: .generelle))", systemImage: "repeat")
+        VStack(spacing: 0) {
+            HStack {
+                Label("\(store.openCount(in: .viktig))", systemImage: "exclamationmark.circle")
+                Spacer()
+                Label("\(store.openCount(in: .generelle))", systemImage: "repeat")
+            }
+            .labelStyle(CompactLabel())
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .frame(height: notch.height + 6)
+
+            NorwayClock()
+                .frame(height: 20)
         }
-        .labelStyle(CompactLabel())
-        .font(.system(size: 12, weight: .semibold, design: .rounded))
-        .foregroundStyle(.white)
-        .padding(.horizontal, 10)
     }
 
     private var openContent: some View {
