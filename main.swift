@@ -215,6 +215,7 @@ struct NotchView: View {
                 }
             }
             .frame(height: 18)
+            .overlay { NorwayClock() }
 
             HStack(alignment: .top, spacing: 14) {
                 column(.viktig, color: .orange)
@@ -300,6 +301,30 @@ struct NotchView: View {
         .onHover { h in
             if h { hoveredRow = item.id } else if hoveredRow == item.id { hoveredRow = nil }
         }
+    }
+}
+
+// Klokka i Norge (følger sommer-/vintertid selv), oppdatert hvert minutt.
+struct NorwayClock: View {
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.timeZone = TimeZone(identifier: "Europe/Oslo")
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            HStack(spacing: 5) {
+                Text("Norge").font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.3))
+                Text(Self.formatter.string(from: context.date))
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.55))
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
 
