@@ -2,7 +2,7 @@
 
 Liten macOS-app som viser en todo-liste i notchen. Hold musa over notchen for tellere, trykk for å åpne lista.
 
-Listen leses fra en markdown-fil med `## Viktig` og `## Generelle` og linjer som `- [ ] oppgave`.
+Listen leses fra en markdown-fil med `## Viktig`, `## Frister` (sortert etter tidligste dato i teksten) og `## Generelle` og linjer som `- [ ] oppgave`.
 
 ## Oppsett
 

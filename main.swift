@@ -16,9 +16,25 @@ let todoPath: String = {
 
 enum Section: String, CaseIterable {
     case viktig = "Viktig"
+    case frister = "Frister"
     case generelle = "Generelle"
 
-    var other: Section { self == .viktig ? .generelle : .viktig }
+    // «Flytt»-knappen går til neste seksjon rundt i ring.
+    var other: Section {
+        let all = Section.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
+    }
+}
+
+// Datoen (YYYY-MM-DD) etter «frist» eller «innen» i teksten, ellers første dato. Brukes til å sortere Frister.
+func deadline(in text: String) -> String? {
+    for pattern in [#"(?:frist|innen)\s+(?:ca\.\s*)?(\d{4}-\d{2}-\d{2})"#, #"(\d{4}-\d{2}-\d{2})"#] {
+        if let r = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]),
+           let d = text[r].range(of: #"\d{4}-\d{2}-\d{2}"#, options: .regularExpression) {
+            return String(text[r][d])
+        }
+    }
+    return nil
 }
 
 struct TodoItem: Identifiable {
@@ -44,7 +60,12 @@ final class TodoStore: ObservableObject {
     // Åpne oppgaver først, avkryssede nederst.
     func items(in section: Section) -> [TodoItem] {
         let all = items.filter { $0.section == section }
-        return all.filter { !$0.done } + all.filter { $0.done }
+        var open = all.filter { !$0.done }
+        // Frister: tidligste dato først, uten dato nederst (sorteringen er stabil).
+        if section == .frister {
+            open.sort { (deadline(in: $0.text) ?? "9999") < (deadline(in: $1.text) ?? "9999") }
+        }
+        return open + all.filter { $0.done }
     }
     func openCount(in section: Section) -> Int { items(in: section).filter { !$0.done }.count }
 
@@ -59,14 +80,14 @@ final class TodoStore: ObservableObject {
     func load() {
         lastMod = modDate()
         guard let text = try? String(contentsOfFile: todoPath, encoding: .utf8) else { items = []; return }
-        // Oppgaver under «## Generelle» havner til høyre, alt annet i «Viktig».
+        // Oppgaver under «## Generelle» og «## Frister» får egne kolonner, alt annet havner i «Viktig».
         var section = Section.viktig
         var parsed: [TodoItem] = []
         for line in text.components(separatedBy: .newlines) {
             let t = line.trimmingCharacters(in: .whitespaces)
             if t.hasPrefix("## ") {
                 let name = t.dropFirst(3).trimmingCharacters(in: .whitespaces).lowercased()
-                section = name.hasPrefix("generell") ? .generelle : .viktig
+                section = name.hasPrefix("generell") ? .generelle : name.hasPrefix("frist") ? .frister : .viktig
                 continue
             }
             for (prefix, done) in [("- [ ] ", false), ("- [x] ", true), ("- [X] ", true)] where t.hasPrefix(prefix) {
@@ -120,9 +141,9 @@ final class NotchModel: ObservableObject {
 }
 
 enum Layout {
-    static let openSize = CGSize(width: 580, height: 330)
-    static let largeSize = CGSize(width: 880, height: 620)
-    static let hoverExtra = CGSize(width: 110, height: 26)  // 6 rundt notchen + 20 til klokka
+    static let openSize = CGSize(width: 800, height: 330)
+    static let largeSize = CGSize(width: 1120, height: 620)
+    static let hoverExtra = CGSize(width: 150, height: 26)  // 6 rundt notchen + 20 til klokka
 }
 
 struct NotchView: View {
@@ -179,7 +200,10 @@ struct NotchView: View {
     private var hoverContent: some View {
         VStack(spacing: 0) {
             HStack {
-                Label("\(store.openCount(in: .viktig))", systemImage: "exclamationmark.circle")
+                HStack(spacing: 8) {
+                    Label("\(store.openCount(in: .viktig))", systemImage: "exclamationmark.circle")
+                    Label("\(store.openCount(in: .frister))", systemImage: "calendar")
+                }
                 Spacer()
                 Label("\(store.openCount(in: .generelle))", systemImage: "repeat")
             }
@@ -225,6 +249,8 @@ struct NotchView: View {
 
             HStack(alignment: .top, spacing: 14) {
                 column(.viktig, color: .orange)
+                Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1)
+                column(.frister, color: .pink)
                 Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1)
                 column(.generelle, color: .cyan)
             }
@@ -291,7 +317,7 @@ struct NotchView: View {
 
             if hoveredRow == item.id {
                 Button { store.move(item.id) } label: {
-                    Image(systemName: item.section == .viktig ? "arrow.right" : "arrow.left").font(.system(size: 10))
+                    Image(systemName: "arrow.right").font(.system(size: 10))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white.opacity(0.5))
@@ -359,7 +385,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenFrame = NSRect.zero
     private var notch = CGSize(width: 200, height: 32)
     private var timer: Timer?
-    private let windowSize = CGSize(width: 920, height: 660)
+    private let windowSize = CGSize(width: 1160, height: 660)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
