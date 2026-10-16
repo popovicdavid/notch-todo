@@ -128,6 +128,13 @@ final class TodoStore: ObservableObject {
         save()
     }
 
+    func edit(_ id: UUID, to text: String) {
+        let t = text.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty, let i = items.firstIndex(where: { $0.id == id }), items[i].text != t else { return }
+        items[i].text = t
+        save()
+    }
+
     func remove(_ id: UUID) { items.removeAll { $0.id == id }; save() }
     func clearDone() { items.removeAll { $0.done }; save() }
 }
@@ -156,6 +163,9 @@ struct NotchView: View {
     @State private var newText: [Section: String] = [:]
     @State private var hoveredRow: UUID?
     @FocusState private var focusedField: Section?
+    @State private var editingRow: UUID?
+    @State private var editText = ""
+    @FocusState private var editFocused: Bool
 
     private var size: CGSize {
         if model.open { return model.large ? Layout.largeSize : Layout.openSize }
@@ -300,6 +310,12 @@ struct NotchView: View {
         .frame(maxWidth: .infinity)
     }
 
+    private func finishEditing(_ id: UUID) {
+        guard editingRow == id else { return }
+        store.edit(id, to: editText)
+        editingRow = nil
+    }
+
     private func row(_ item: TodoItem, color: Color) -> some View {
         HStack(alignment: .top, spacing: 7) {
             Button { store.toggle(item.id) } label: {
@@ -309,11 +325,33 @@ struct NotchView: View {
             }
             .buttonStyle(.plain)
 
-            Text(LocalizedStringKey(item.text))
-                .font(.system(size: 12.5))
-                .strikethrough(item.done)
-                .foregroundStyle(item.done ? Color.white.opacity(0.4) : Color.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if editingRow == item.id {
+                TextField("", text: $editText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12.5))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.12)))
+                    .focused($editFocused)
+                    .onSubmit { finishEditing(item.id) }
+                    .onExitCommand { editingRow = nil }
+                    .onChange(of: editFocused) { _, focused in
+                        if !focused && editingRow == item.id { finishEditing(item.id) }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Text(LocalizedStringKey(item.text))
+                    .font(.system(size: 12.5))
+                    .strikethrough(item.done)
+                    .foregroundStyle(item.done ? Color.white.opacity(0.4) : Color.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 2) {
+                        editText = item.text
+                        editingRow = item.id
+                        DispatchQueue.main.async { editFocused = true }
+                    }
+            }
 
             if hoveredRow == item.id {
                 Button { store.move(item.id) } label: {
