@@ -1,15 +1,38 @@
 # NotchTodo
 
-Liten macOS-app som viser en todo-liste i notchen. Hold musa over notchen for tellere, trykk for å åpne lista.
+A small macOS app that shows your todo list in the notch. Hover over the notch for task counters, click it to open the list.
 
-Listen leses fra en markdown-fil med `## Viktig`, `## Frister` (sortert etter tidligste dato i teksten) og `## Generelle` og linjer som `- [ ] oppgave`.
+## What it does
 
-## Oppsett
+- Reads tasks from a plain markdown file and reloads automatically when the file changes.
+- Three sections: `## Viktig` (important), `## Frister` (deadlines) and `## Generelle` (general).
+- Deadlines are sorted by the earliest date in each task (`frist 2026-11-01`, `innen 2026-11-01`, or any `YYYY-MM-DD`).
+- Checked tasks move to the bottom. Double-click a task to edit it. A button moves a task to the next section.
+- Shows the clock in Norwegian time when you hover over the notch.
 
-Skriv stien til todo-filen i `~/.config/notch-todo/path`. Uten den brukes `~/todo.md`.
+## Task file
+
+```markdown
+# Todo
+
+## Viktig
+- [ ] Reply to the email
+
+## Frister
+- [ ] Hand in the report, frist 2026-11-01
+
+## Generelle
+- [ ] Go through the weekly notes
+```
+
+## Setup
+
+Write the path to your todo file in `~/.config/notch-todo/path` (one line). Without it, `~/todo.md` is used.
 
 ```sh
 ./build.sh
 ```
 
-Krever macOS 14 og Swift.
+The script compiles `main.swift`, signs the app ad hoc, copies it to `~/Applications` and starts it.
+
+Requires macOS 14 or newer, Apple Silicon and the Swift toolchain. Written in Swift with SwiftUI and AppKit.
