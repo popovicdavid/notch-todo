@@ -19,8 +19,7 @@ jobs:
           swiftc .github/memtool/mouse.swift -o build/mouse
           info=$(build/mouse 10 400 | tr '\n' ' ')
           echo "::notice title=Skjermer::$info"
-          W=$(build/mouse 10 400 | head -1 | sed -E 's/.*\(\(0\.0, 0\.0\), \(([0-9.]+), .*/\1/')
-          X=$(echo "$W / 2" | bc)
+          X=$(build/mouse 10 400 | awk '{print $1}')
           fp() { vmmap -summary "$1" 2>/dev/null | grep -E 'Physical footprint:' | head -1 | sed -E 's/ +/ /g'; }
           measure() {
             "$1" &

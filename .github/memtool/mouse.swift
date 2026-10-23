@@ -9,4 +9,4 @@ if a.count > 3 {
     CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
     CGEvent(mouseEventSource: nil, mouseType: .leftMouseUp, mouseCursorPosition: p, mouseButton: .left)?.post(tap: .cghidEventTap)
 }
-for s in NSScreen.screens { print("skjerm", s.frame, "skala", s.backingScaleFactor) }
+if let s = NSScreen.screens.first { print(Int(s.frame.width / 2), "skjerm \(Int(s.frame.width))×\(Int(s.frame.height)) skala \(s.backingScaleFactor)") }
