@@ -1,0 +1,41 @@
+name: Bygg og test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bygg uten advarsler
+        run: |
+          swiftc --version
+          mkdir -p build
+          set +e
+          swiftc -O -swift-version 5 -target arm64-apple-macos14 $(find Sources -name '*.swift') \
+            -o build/NotchTodo > build/log.txt 2>&1
+          status=$?
+          set -e
+          cat build/log.txt
+          # Feil og advarsler som merknader på commiten.
+          sed -nE 's#^([^:]+\.swift):([0-9]+):([0-9]+): (error|warning): (.*)$#::\4 file=\1,line=\2,col=\3::\5#p' build/log.txt \
+            | sed "s#file=$PWD/#file=#"
+          if [ $status -ne 0 ]; then exit $status; fi
+          if grep -q ': warning: ' build/log.txt; then echo "::error::Bygget ga advarsler"; exit 1; fi
+
+      - name: Tester
+        run: |
+          set +e
+          ./test.sh > build/test.txt 2>&1
+          status=$?
+          cat build/test.txt
+          grep '^FEIL' build/test.txt | sed 's/^/::error::/'
+          tail -1 build/test.txt | sed 's/^/::notice title=Tester::/'
+          exit $status

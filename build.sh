@@ -7,7 +7,7 @@ APP=build/NotchTodo.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 
-swiftc -O -swift-version 5 -target arm64-apple-macos14 main.swift -o "$APP/Contents/MacOS/NotchTodo"
+swiftc -O -swift-version 5 -target arm64-apple-macos14 Sources/**/*.swift -o "$APP/Contents/MacOS/NotchTodo"
 
 cat > "$APP/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>

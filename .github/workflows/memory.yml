@@ -1,0 +1,32 @@
+name: Minne (midlertidig)
+
+on: push
+
+jobs:
+  memory:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Mål minnet før og etter
+        run: |
+          printf '# Todo\n\n## Viktig\n\n- [ ] Svar på e-posten\n- [ ] Ring legen\n- [x] Bestill time\n\n## Frister\n\n- [ ] Lever rapporten, frist 2026-11-01\n- [ ] Søknad (innen 2026-10-25)\n\n## Generelle\n\n- [ ] Gå gjennom ukenotatene\n- [ ] Rydd skrivebordet\n\n## Senere\n\n- [ ] Søk sommerjobb, frist 2027-04-01\n' > ~/todo.md
+          mkdir -p build
+          git show origin/main:main.swift > build/before.swift
+          swiftc -O -swift-version 5 -target arm64-apple-macos14 build/before.swift -o build/before
+          swiftc -O -swift-version 5 -target arm64-apple-macos14 $(find Sources -name '*.swift') -o build/after
+          system_profiler SPDisplaysDataType | grep -iE 'resolution|retina' | head -4 | sed 's/^ */::notice title=Skjerm::/'
+          measure() {
+            "$1" &
+            pid=$!
+            sleep 12
+            footprint "$pid" | head -30
+            line=$(footprint "$pid" | grep -i 'footprint:' | head -1)
+            echo "::notice title=$2 runde $3::$line"
+            kill "$pid"; sleep 2
+          }
+          for round in 1 2 3; do
+            measure build/before Før $round
+            measure build/after Etter $round
+          done
