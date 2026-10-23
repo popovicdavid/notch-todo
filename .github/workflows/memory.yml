@@ -16,6 +16,8 @@ jobs:
           git show origin/main:main.swift > build/before.swift
           swiftc -O -swift-version 5 -target arm64-apple-macos14 build/before.swift -o build/before
           swiftc -O -swift-version 5 -target arm64-apple-macos14 $(find Sources -name '*.swift') -o build/after
+          swiftc -O -swift-version 5 -target arm64-apple-macos14 -D NO_TEXTVIEW $(find Sources -name '*.swift') -o build/notv
+          swiftc -O -swift-version 5 -target arm64-apple-macos14 -D NO_TEXTVIEW -D NO_DND $(find Sources -name '*.swift') -o build/nodnd
           swiftc .github/memtool/mouse.swift -o build/mouse
           info=$(build/mouse 10 400 | tr '\n' ' ')
           echo "::notice title=Skjermer::$info"
@@ -26,18 +28,20 @@ jobs:
             pid=$!
             sleep 10
             idle=$(fp $pid)
-            build/mouse $X 5 click > /dev/null; sleep 3
+            build/mouse $X 5 click > /dev/null; sleep 6
             opened=$(fp $pid)
-            vmmap -summary $pid | awk '/^REGION TYPE/{on=1;next} on && NF>4 && $1!~/^=/' | sort -t' ' -k1,1 | head -60 > build/regions.txt
-            grep -E 'MALLOC|IOSurface|CoreAnimation|CG |IOKit|__DATA|Stack|Memory Tag|Image IO|TOTAL' build/regions.txt | sed -E 's/ +/ /g' | head -14 | tr '\n' ';' | sed "s/^/::notice title=$2 åpen regioner::/"; echo
+            libs=$(vmmap $pid | grep -c '__TEXT')
+            echo "::notice title=$2 libs::$libs"
             build/mouse $X 5 click > /dev/null; sleep 1
-            build/mouse 10 400 > /dev/null; sleep 3
+            build/mouse 10 400 > /dev/null; sleep 6
             closed=$(fp $pid)
             echo "::notice title=$2 runde $3::lukket: $idle | åpen: $opened | lukket igjen: $closed"
             vmmap -summary $pid | grep -E 'IOSurface|CoreAnimation|CG raster|MALLOC_|TOTAL' | head -12
             kill "$pid"; sleep 2
           }
-          for round in 1; do
+          for round in 1 2; do
             measure build/before Før $round
             measure build/after Etter $round
+            measure build/notv UtenTekstvisning $round
+            measure build/nodnd UtenDraOgSlipp $round
           done
