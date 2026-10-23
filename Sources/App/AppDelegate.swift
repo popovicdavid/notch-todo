@@ -180,6 +180,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Gi tastaturet tilbake til appen du var i.
         panel.orderOut(nil)
         panel.orderFrontRegardless()
+        // Når lista er borte: gi minnet den brukte tilbake til systemet, i stedet for å holde på det til neste gang.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard self?.model.open == false else { return }
+            malloc_zone_pressure_relief(nil, 0)
+        }
     }
 
     // MARK: Tastatur
