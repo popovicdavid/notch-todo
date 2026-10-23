@@ -2,6 +2,9 @@ name: Minne (midlertidig)
 
 on: push
 
+permissions:
+  contents: write
+
 jobs:
   memory:
     runs-on: macos-15
@@ -31,11 +34,23 @@ jobs:
             build/mouse $X 5 click > /dev/null; sleep 1
             build/mouse 10 400 > /dev/null; sleep 6
             closed=$(fp $pid)
+            mkdir -p ~/logs
+            vmmap -summary $pid > ~/logs/$2-$3-vmmap.txt 2>&1
+            heap -s $pid > ~/logs/$2-$3-heap.txt 2>&1 || heap $pid > ~/logs/$2-$3-heap.txt 2>&1
+            footprint -v $pid > ~/logs/$2-$3-footprint.txt 2>&1
             echo "::notice title=$2 runde $3::lukket: $idle | åpen: $opened | lukket igjen: $closed"
             vmmap -summary $pid | grep -E 'IOSurface|CoreAnimation|CG raster|MALLOC_|TOTAL' | head -12
             kill "$pid"; sleep 2
           }
-          for round in 1 2 3; do
+          for round in 1; do
             measure build/before Før $round
             measure build/after Etter $round
           done
+      - name: Legg loggene på en egen gren
+        if: always()
+        run: |
+          cd ~/logs
+          git init -q -b ci-logs
+          git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "logger"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-logs
