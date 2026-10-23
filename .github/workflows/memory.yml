@@ -6,7 +6,7 @@ jobs:
   memory:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Mål minnet før og etter
@@ -16,17 +16,27 @@ jobs:
           git show origin/main:main.swift > build/before.swift
           swiftc -O -swift-version 5 -target arm64-apple-macos14 build/before.swift -o build/before
           swiftc -O -swift-version 5 -target arm64-apple-macos14 $(find Sources -name '*.swift') -o build/after
-          system_profiler SPDisplaysDataType | grep -iE 'resolution|retina' | head -4 | sed 's/^ */::notice title=Skjerm::/'
+          swiftc .github/memtool/mouse.swift -o build/mouse
+          info=$(build/mouse 10 400 | tr '\n' ' ')
+          echo "::notice title=Skjermer::$info"
+          W=$(build/mouse 10 400 | head -1 | sed -E 's/.*\(\(0\.0, 0\.0\), \(([0-9.]+), .*/\1/')
+          X=$(echo "$W / 2" | bc)
+          fp() { vmmap -summary "$1" 2>/dev/null | grep -E 'Physical footprint:' | head -1 | sed -E 's/ +/ /g'; }
           measure() {
             "$1" &
             pid=$!
-            sleep 12
-            footprint "$pid" | head -30
-            line=$(footprint "$pid" | grep -i 'footprint:' | head -1)
-            echo "::notice title=$2 runde $3::$line"
+            sleep 10
+            idle=$(fp $pid)
+            build/mouse $X 5 click > /dev/null; sleep 3
+            opened=$(fp $pid)
+            build/mouse $X 5 click > /dev/null; sleep 1
+            build/mouse 10 400 > /dev/null; sleep 3
+            closed=$(fp $pid)
+            echo "::notice title=$2 runde $3::lukket: $idle | åpen: $opened | lukket igjen: $closed"
+            vmmap -summary $pid | grep -E 'IOSurface|CoreAnimation|CG raster|MALLOC_|TOTAL' | head -12
             kill "$pid"; sleep 2
           }
-          for round in 1 2 3; do
+          for round in 1 2; do
             measure build/before Før $round
             measure build/after Etter $round
           done

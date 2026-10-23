@@ -154,6 +154,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inside = activeRect.contains(NSEvent.mouseLocation)
         if panel.ignoresMouseEvents == inside { panel.ignoresMouseEvents = !inside }
         if !model.open && inside != model.hovering {
+            // Mens tellerne vises følger vi med på fila. Ellers gjøres ingenting før neste hover.
+            store.live = inside
             if inside { store.refreshIfStale() }
             model.hovering = inside
         }
