@@ -31,12 +31,16 @@ jobs:
             idle=$(fp $pid)
             build/mouse $X 5 click > /dev/null; sleep 6
             opened=$(fp $pid)
+            wake=$(top -l 2 -s 10 -pid $pid -stats pid,cpu,idlew | tail -1 | awk '{print "cpu " $2 "%, idle wakeups " $3 " på 10 s"}')
+            echo "::notice title=$2 åpen energi::$wake"
             win1=$(build/mouse $X 5 noclick-but-list $pid 2>/dev/null | grep vindu | tr '\n' ' ')
             build/mouse $X 5 click > /dev/null; sleep 1
             build/mouse 10 400 > /dev/null; sleep 6
+            wake2=$(top -l 2 -s 10 -pid $pid -stats pid,cpu,idlew | tail -1 | awk '{print "cpu " $2 "%, idle wakeups " $3 " på 10 s"}')
+            echo "::notice title=$2 lukket energi::$wake2"
             closed=$(fp $pid)
             win2=$(build/mouse 10 400 x $pid 2>/dev/null | grep vindu | tr '\n' ' ')
-            echo "::notice title=$2 vinduer::åpen: $win1 | lukket: $win2"
+            [ "$3" = 1 ] && echo "::notice title=$2 vinduer::åpen: $win1 | lukket: $win2"
             mkdir -p ~/logs
             vmmap -summary $pid > ~/logs/$2-$3-vmmap.txt 2>&1
             heap -s $pid > ~/logs/$2-$3-heap.txt 2>&1 || heap $pid > ~/logs/$2-$3-heap.txt 2>&1
@@ -45,7 +49,7 @@ jobs:
             vmmap -summary $pid | grep -E 'IOSurface|CoreAnimation|CG raster|MALLOC_|TOTAL' | head -12
             kill "$pid"; sleep 2
           }
-          for round in 1; do
+          for round in 1 2; do
             measure build/before Før $round
             measure build/after Etter $round
           done

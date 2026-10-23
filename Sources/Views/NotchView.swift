@@ -284,12 +284,6 @@ struct NotchView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                #if NO_TEXTVIEW
-                Text(LocalizedStringKey(displayText(item.text, in: item.section)))
-                    .font(.system(size: 12.5))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onTapGesture(count: 2) { beginEditing(item) }
-                #else
                 TaskText(
                     text: displayText(item.text, in: item.section),
                     done: item.done,
@@ -299,7 +293,6 @@ struct NotchView: View {
                     onCopySection: { copySection(item.section) }
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
-                #endif
 
                 if let chip { DueChipView(chip: chip, color: color) }
             }
@@ -338,9 +331,6 @@ struct NotchView: View {
             Button("Kopier") { Clipboard.copy(item.text) }
             Button("Kopier hele seksjonen") { copySection(item.section) }
         }
-        #if NO_DND
-        .id(0)
-        #else
         // Dra fra raden (utenfor selve teksten, som kan markeres). Andre apper får teksten.
         .onDrag {
             model.dragging = item.id
@@ -349,7 +339,6 @@ struct NotchView: View {
         .onDrop(of: [.plainText], isTargeted: dropBinding(.row(item.id))) { providers in
             drop(providers, into: item.section, before: item.id)
         }
-        #endif
     }
 
     // MARK: Dra og slipp
