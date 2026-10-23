@@ -177,6 +177,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.hovering = false
         model.select(nil)
         model.hover(nil)
+        // Slipp fokus, så tekstfeltene i lista ikke holdes i live mens den er lukket.
+        panel.makeFirstResponder(nil)
         // Gi tastaturet tilbake til appen du var i.
         panel.orderOut(nil)
         panel.orderFrontRegardless()
