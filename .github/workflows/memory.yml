@@ -31,9 +31,12 @@ jobs:
             idle=$(fp $pid)
             build/mouse $X 5 click > /dev/null; sleep 6
             opened=$(fp $pid)
+            win1=$(build/mouse $X 5 noclick-but-list $pid 2>/dev/null | grep vindu | tr '\n' ' ')
             build/mouse $X 5 click > /dev/null; sleep 1
             build/mouse 10 400 > /dev/null; sleep 6
             closed=$(fp $pid)
+            win2=$(build/mouse 10 400 x x $pid 2>/dev/null | grep vindu | tr '\n' ' ')
+            echo "::notice title=$2 vinduer::åpen: $win1 | lukket: $win2"
             mkdir -p ~/logs
             vmmap -summary $pid > ~/logs/$2-$3-vmmap.txt 2>&1
             heap -s $pid > ~/logs/$2-$3-heap.txt 2>&1 || heap $pid > ~/logs/$2-$3-heap.txt 2>&1
