@@ -28,6 +28,8 @@ jobs:
             idle=$(fp $pid)
             build/mouse $X 5 click > /dev/null; sleep 3
             opened=$(fp $pid)
+            vmmap -summary $pid | awk '/^REGION TYPE/{on=1;next} on && NF>4 && $1!~/^=/' | sort -t' ' -k1,1 | head -60 > build/regions.txt
+            grep -E 'MALLOC|IOSurface|CoreAnimation|CG |IOKit|__DATA|Stack|Memory Tag|Image IO|TOTAL' build/regions.txt | sed -E 's/ +/ /g' | head -14 | tr '\n' ';' | sed "s/^/::notice title=$2 åpen regioner::/"; echo
             build/mouse $X 5 click > /dev/null; sleep 1
             build/mouse 10 400 > /dev/null; sleep 3
             closed=$(fp $pid)
@@ -35,7 +37,7 @@ jobs:
             vmmap -summary $pid | grep -E 'IOSurface|CoreAnimation|CG raster|MALLOC_|TOTAL' | head -12
             kill "$pid"; sleep 2
           }
-          for round in 1 2; do
+          for round in 1; do
             measure build/before Før $round
             measure build/after Etter $round
           done
