@@ -18,6 +18,10 @@ enum Section: String, CaseIterable {
     case viktig = "Viktig"
     case frister = "Frister"
     case generelle = "Generelle"
+    case senere = "Senere"  // langt frem i tid, holdes utenfor tellerne i notchet
+
+    // Frister og Senere sorteres etter dato.
+    var dated: Bool { self == .frister || self == .senere }
 
     // «Flytt»-knappen går til neste seksjon rundt i ring.
     var other: Section {
@@ -61,8 +65,8 @@ final class TodoStore: ObservableObject {
     func items(in section: Section) -> [TodoItem] {
         let all = items.filter { $0.section == section }
         var open = all.filter { !$0.done }
-        // Frister: tidligste dato først, uten dato nederst (sorteringen er stabil).
-        if section == .frister {
+        // Frister og Senere: tidligste dato først, uten dato nederst (sorteringen er stabil).
+        if section.dated {
             open.sort { (deadline(in: $0.text) ?? "9999") < (deadline(in: $1.text) ?? "9999") }
         }
         return open + all.filter { $0.done }
@@ -80,14 +84,15 @@ final class TodoStore: ObservableObject {
     func load() {
         lastMod = modDate()
         guard let text = try? String(contentsOfFile: todoPath, encoding: .utf8) else { items = []; return }
-        // Oppgaver under «## Generelle» og «## Frister» får egne kolonner, alt annet havner i «Viktig».
+        // Oppgaver under «## Generelle», «## Frister» og «## Senere» får egne kolonner, alt annet havner i «Viktig».
         var section = Section.viktig
         var parsed: [TodoItem] = []
         for line in text.components(separatedBy: .newlines) {
             let t = line.trimmingCharacters(in: .whitespaces)
             if t.hasPrefix("## ") {
                 let name = t.dropFirst(3).trimmingCharacters(in: .whitespaces).lowercased()
-                section = name.hasPrefix("generell") ? .generelle : name.hasPrefix("frist") ? .frister : .viktig
+                section = name.hasPrefix("generell") ? .generelle : name.hasPrefix("frist") ? .frister
+                    : name.hasPrefix("senere") ? .senere : .viktig
                 continue
             }
             for (prefix, done) in [("- [ ] ", false), ("- [x] ", true), ("- [X] ", true)] where t.hasPrefix(prefix) {
@@ -148,8 +153,8 @@ final class NotchModel: ObservableObject {
 }
 
 enum Layout {
-    static let openSize = CGSize(width: 800, height: 330)
-    static let largeSize = CGSize(width: 1120, height: 620)
+    static let openSize = CGSize(width: 1000, height: 330)
+    static let largeSize = CGSize(width: 1280, height: 620)
     static let hoverExtra = CGSize(width: 150, height: 26)  // 6 rundt notchen + 20 til klokka
 }
 
@@ -263,6 +268,8 @@ struct NotchView: View {
                 column(.frister, color: .pink)
                 Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1)
                 column(.generelle, color: .cyan)
+                Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1)
+                column(.senere, color: .purple)
             }
         }
         .foregroundStyle(.white)
