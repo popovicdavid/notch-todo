@@ -6,7 +6,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let model = NotchModel()
     private let store = TodoStore(path: todoPath)
     private var activeRect = NSRect.zero  // området der musa holder notchen åpen, regnes ut når tilstanden endres
-    private var shrink: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -90,39 +89,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let g = currentGeometry()
         guard g != model.geometry else { return }
         model.geometry = g
-        shrink?.cancel()
         panel.setFrame(panelFrame(), display: true)
     }
 
-    // Panelet er bare så stort som tilstanden trenger (pluss plass til skyggen), ikke hele tiden 1160 × 660.
-    // Lukket og hover deler størrelse, så panelet ikke endrer størrelse hver gang musa går over notchen.
+    // Panelet har fast størrelse: plass til den største lista (stor visning, Senere åpen) og skyggen, regnet ut fra skjermen.
+    // Det endres bare når skjermene endres. Å endre størrelse underveis ga hakking og rester av lista i notchen.
     private func panelFrame() -> NSRect {
-        let s = model.open ? model.listSize : model.geometry.hoverSize
-        let pad = model.open ? CGSize(width: 30, height: 40) : CGSize(width: 10, height: 10)
-        return centered(CGSize(width: s.width + 2 * pad.width, height: s.height + pad.height))
-    }
-
-    private func centered(_ size: CGSize) -> NSRect {
-        let sf = model.geometry.screen
-        return NSRect(x: (sf.midX - size.width / 2).rounded(), y: sf.maxY - size.height,
+        let g = model.geometry
+        let s = g.listSize(large: true, laterCollapsed: false)
+        let size = CGSize(width: min(s.width + 60, g.screen.width), height: s.height + 40)
+        return NSRect(x: (g.screen.midX - size.width / 2).rounded(), y: g.screen.maxY - size.height,
                       width: size.width, height: size.height)
     }
 
     private func layoutChanged() {
         updateActiveRect()
-        guard let panel else { return }
-        let target = panelFrame()
-        let current = panel.frame
-        guard target != current else { return }
-        shrink?.cancel()
-        // Større: med en gang, så animasjonen har plass. Mindre: etter animasjonen, så den ikke kuttes.
-        let grown = centered(CGSize(width: max(target.width, current.width), height: max(target.height, current.height)))
-        if grown != current { panel.setFrame(grown, display: false) }
-        if grown != target {
-            let work = DispatchWorkItem { [weak self] in self?.panel.setFrame(target, display: false) }
-            shrink = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
-        }
     }
 
     private func rect(_ s: CGSize) -> NSRect {

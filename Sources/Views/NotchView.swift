@@ -35,13 +35,12 @@ struct NotchView: View {
                 .shadow(color: .black.opacity(model.open ? 0.45 : 0), radius: 14, y: 6)
 
             // Klokka og innholdet finnes bare når de vises, så ingenting tegnes eller oppdateres når lista er lukket.
-            // Lista forsvinner med en gang den lukkes: tekstvisningene (AppKit) blir ikke med på en uttoning,
-            // og ville ellers hengt igjen i notchen mens formen krymper. Alt klippes også til formen.
+            // Innholdet klippes til formen, så ingenting stikker ut mens den animeres.
             if model.open {
                 openContent
                     .frame(width: size.width, height: size.height)
                     .clipShape(shape)
-                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
+                    .transition(.opacity)
             } else if model.hovering {
                 hoverContent
                     .frame(width: size.width, height: size.height)
@@ -299,15 +298,28 @@ struct NotchView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                TaskText(
-                    text: displayText(item.text, in: item.section),
-                    done: item.done,
-                    onClick: { model.select(item.id) },
-                    onDoubleClick: { beginEditing(item) },
-                    onCopy: { Clipboard.copy(item.text) },
-                    onCopySection: { copySection(item.section) }
-                )
-                .frame(maxWidth: .infinity, alignment: .leading)
+                // Vanlig SwiftUI-tekst, som før. Raden musa er over (eller som er valgt) får i tillegg en markerbar
+                // tekstvisning oppå, så teksten kan markeres og kopieres uten at hver rad må ha en (det gjorde lista treg).
+                let shown = displayText(item.text, in: item.section)
+                let selectable = hovered || model.selected == item.id
+                Text(LocalizedStringKey(shown))
+                    .font(.system(size: 12.5))
+                    .strikethrough(item.done)
+                    .foregroundStyle(item.done ? Color.white.opacity(0.4) : Color.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .opacity(selectable ? 0 : 1)
+                    .overlay(alignment: .topLeading) {
+                        if selectable {
+                            TaskText(
+                                text: shown,
+                                done: item.done,
+                                onClick: { model.select(item.id) },
+                                onDoubleClick: { beginEditing(item) },
+                                onCopy: { Clipboard.copy(item.text) },
+                                onCopySection: { copySection(item.section) }
+                            )
+                        }
+                    }
 
                 if let chip { DueChipView(chip: chip, color: color) }
             }
