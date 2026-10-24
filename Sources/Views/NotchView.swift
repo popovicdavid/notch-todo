@@ -35,16 +35,13 @@ struct NotchView: View {
                 .shadow(color: .black.opacity(model.open ? 0.45 : 0), radius: 14, y: 6)
 
             // Klokka og innholdet finnes bare når de vises, så ingenting tegnes eller oppdateres når lista er lukket.
-            // Innholdet klippes til formen, så ingenting stikker ut mens den animeres.
             if model.open {
                 openContent
                     .frame(width: size.width, height: size.height)
-                    .clipShape(shape)
                     .transition(.opacity)
             } else if model.hovering {
                 hoverContent
                     .frame(width: size.width, height: size.height)
-                    .clipShape(shape)
                     .transition(.opacity)
             }
         }
@@ -196,7 +193,7 @@ struct NotchView: View {
     }
 
     private func header(_ section: Section) -> some View {
-        Hoverable { hovered, _ in header(section, hovered: hovered) }
+        Hoverable { hovered in header(section, hovered: hovered) }
     }
 
     private func header(_ section: Section, hovered: Bool) -> some View {
@@ -264,15 +261,14 @@ struct NotchView: View {
     }
 
     private func row(_ item: TodoItem) -> some View {
-        Hoverable(settleDelay: 0.35) { h in
+        Hoverable { h in
             if h { model.hoveredRow = item.id } else if model.hoveredRow == item.id { model.hoveredRow = nil }
-        } content: { hovered, settled in
-            row(item, hovered: hovered, settled: settled)
+        } content: { hovered in
+            row(item, hovered: hovered)
         }
     }
 
-    // settled: musa har stått i ro over raden en liten stund.
-    private func row(_ item: TodoItem, hovered: Bool, settled: Bool) -> some View {
+    private func row(_ item: TodoItem, hovered: Bool) -> some View {
         let color = item.section.color
         let chip = item.section.dated && !item.done ? dueChip(for: item.text) : nil
 
@@ -299,11 +295,10 @@ struct NotchView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                // Vanlig SwiftUI-tekst, som før. Raden musa hviler over (eller som er valgt) får i tillegg en markerbar
-                // tekstvisning oppå, så teksten kan markeres og kopieres. Den lages først når musa har stoppet,
-                // ellers ble det hakkete å dra musa over lista (en ny tekstvisning for hver rad).
+                // Vanlig SwiftUI-tekst, som før. Den valgte raden (klikk på den) får i tillegg en markerbar tekstvisning
+                // oppå, så teksten kan markeres og kopieres. Å lage den ved hover ga hakking når musa gikk over lista.
                 let shown = displayText(item.text, in: item.section)
-                let selectable = settled || model.selected == item.id
+                let selectable = model.selected == item.id
                 Text(LocalizedStringKey(shown))
                     .font(.system(size: 12.5))
                     .strikethrough(item.done)
@@ -404,29 +399,16 @@ struct NotchView: View {
 }
 
 // Hover som bare tegner denne delen på nytt, ikke hele lista.
-// settled blir sann når musa har vært over i settleDelay sekunder.
 struct Hoverable<Content: View>: View {
-    var settleDelay: TimeInterval?
     var onChange: (Bool) -> Void = { _ in }
-    @ViewBuilder let content: (_ hovered: Bool, _ settled: Bool) -> Content
+    @ViewBuilder let content: (Bool) -> Content
     @State private var hovered = false
-    @State private var settled = false
-    @State private var pending: DispatchWorkItem?
 
     var body: some View {
-        content(hovered, settled).onHover { h in
+        content(hovered).onHover { h in
             guard h != hovered else { return }
             hovered = h
             onChange(h)
-            pending?.cancel()
-            pending = nil
-            if h, let delay = settleDelay {
-                let work = DispatchWorkItem { settled = true }
-                pending = work
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
-            } else if settled {
-                settled = false
-            }
         }
     }
 }
