@@ -151,7 +151,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.large = false
         model.hovering = false
         model.select(nil)
-        model.hoveredRow = nil
         // Slipp fokus, så tekstfeltene i lista ikke holdes i live mens den er lukket.
         panel.makeFirstResponder(nil)
         // Gi tastaturet tilbake til appen du var i.
@@ -171,10 +170,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let typing = textView?.isEditable == true
         let hasSelection = (textView?.selectedRange().length ?? 0) > 0
 
-        // cmd+C: markert tekst kopieres som vanlig, ellers oppgaven musa er over eller den som er valgt.
+        // cmd+C: markert tekst kopieres som vanlig, ellers den valgte oppgaven.
         if flags == .command, key == "c" {
             if hasSelection { return event }
-            guard let id = model.hoveredRow ?? model.selected, let item = store.item(id) else { return event }
+            guard let id = model.selected, let item = store.item(id) else { return event }
             Clipboard.copy(item.text)
             return nil
         }

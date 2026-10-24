@@ -193,10 +193,6 @@ struct NotchView: View {
     }
 
     private func header(_ section: Section) -> some View {
-        Hoverable { hovered in header(section, hovered: hovered) }
-    }
-
-    private func header(_ section: Section, hovered: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(section.rawValue).font(.system(size: 14, weight: .bold)).foregroundStyle(section.color)
             Text("\(store.openCount(in: section)) igjen").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
@@ -204,7 +200,6 @@ struct NotchView: View {
             Group {
                 Button { copySection(section) } label: { Image(systemName: "doc.on.doc") }
                     .help("Kopier hele seksjonen")
-                    .opacity(hovered ? 1 : 0)
                 if section == .senere {
                     Button { model.laterCollapsed = true } label: { Image(systemName: "chevron.right.2") }
                         .help("Klapp sammen Senere")
@@ -212,7 +207,7 @@ struct NotchView: View {
             }
             .buttonStyle(.plain)
             .font(.system(size: 10, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.45))
+            .foregroundStyle(.white.opacity(0.3))
         }
         .contentShape(Rectangle())
         .contextMenu {
@@ -260,17 +255,12 @@ struct NotchView: View {
         Clipboard.copy(store.doc.markdown(for: section))
     }
 
+    // Radene reagerer ikke på hover (det ga hakking når musa gikk over lista). Klikk velger en rad:
+    // den får markerbar tekst og knappene for flytt og slett. Alt finnes også i høyreklikkmenyen.
     private func row(_ item: TodoItem) -> some View {
-        Hoverable { h in
-            if h { model.hoveredRow = item.id } else if model.hoveredRow == item.id { model.hoveredRow = nil }
-        } content: { hovered in
-            row(item, hovered: hovered)
-        }
-    }
-
-    private func row(_ item: TodoItem, hovered: Bool) -> some View {
         let color = item.section.color
         let chip = item.section.dated && !item.done ? dueChip(for: item.text) : nil
+        let selected = model.selected == item.id
 
         return HStack(alignment: .top, spacing: 7) {
             Button { store.toggle(item.id) } label: {
@@ -295,19 +285,17 @@ struct NotchView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                // Vanlig SwiftUI-tekst, som før. Den valgte raden (klikk på den) får i tillegg en markerbar tekstvisning
-                // oppå, så teksten kan markeres og kopieres. Å lage den ved hover ga hakking når musa gikk over lista.
+                // Vanlig SwiftUI-tekst, som før. Den valgte raden får en markerbar tekstvisning oppå.
                 let shown = displayText(item.text, in: item.section)
-                let selectable = model.selected == item.id
                 Text(LocalizedStringKey(shown))
                     .font(.system(size: 12.5))
                     .strikethrough(item.done)
                     .foregroundStyle(item.done ? Color.white.opacity(0.4) : Color.white)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .opacity(selectable ? 0 : 1)
+                    .opacity(selected ? 0 : 1)
                     .onTapGesture(count: 2) { beginEditing(item) }
                     .overlay(alignment: .topLeading) {
-                        if selectable {
+                        if selected {
                             TaskText(
                                 text: shown,
                                 done: item.done,
@@ -322,32 +310,27 @@ struct NotchView: View {
                 if let chip { DueChipView(chip: chip, color: color) }
             }
 
-            // Knappene har alltid sin plass og vises bare ved hover. Før tok de plass fra teksten når de dukket opp,
-            // så teksten brøt om, raden endret høyde og alt under hoppet (det føltes som hakking og forsinkelse).
-            let showButtons = hovered && editingRow != item.id
+            // Fast plass til knappene, så ingenting flytter seg når en rad velges.
             HStack(spacing: 7) {
-                Button { store.move(item.id, to: item.section.other) } label: {
-                    Image(systemName: "arrow.right").font(.system(size: 10))
-                }
-                #if !NO_HELP
-                .help("Flytt til \(item.section.other.rawValue)")
-                #endif
+                if selected && editingRow != item.id {
+                    Button { store.move(item.id, to: item.section.other) } label: {
+                        Image(systemName: "arrow.right").font(.system(size: 10))
+                    }
+                    .help("Flytt til \(item.section.other.rawValue)")
 
-                Button { store.remove(item.id) } label: { Image(systemName: "xmark").font(.system(size: 10)) }
-                #if !NO_HELP
-                    .help("Slett")
-                #endif
+                    Button { store.remove(item.id) } label: { Image(systemName: "xmark").font(.system(size: 10)) }
+                        .help("Slett")
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white.opacity(0.5))
-            .opacity(showButtons ? 1 : 0)
-            .allowsHitTesting(showButtons)
+            .frame(width: 30, alignment: .trailing)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(Color.white.opacity(model.selected == item.id ? 0.1 : 0))
+                .fill(Color.white.opacity(selected ? 0.1 : 0))
         )
         .overlay(alignment: .top) {
             if model.dropTarget == .row(item.id) {
@@ -356,14 +339,14 @@ struct NotchView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { model.select(item.id) }
-        #if !NO_MENU
         .contextMenu {
             Button("Kopier") { Clipboard.copy(item.text) }
+            Button("Flytt til \(item.section.other.rawValue)") { store.move(item.id, to: item.section.other) }
+            Button("Slett") { store.remove(item.id) }
+            Divider()
             Button("Kopier hele seksjonen") { copySection(item.section) }
         }
-        #endif
-        #if !NO_DND
-        // Dra fra raden (utenfor selve teksten, som kan markeres). Andre apper får teksten.
+        // Dra fra raden (utenfor selve teksten når den er markerbar). Andre apper får teksten.
         .onDrag {
             model.dragging = item.id
             return NSItemProvider(object: item.text as NSString)
@@ -371,7 +354,6 @@ struct NotchView: View {
         .onDrop(of: [.plainText], isTargeted: dropBinding(.row(item.id))) { providers in
             drop(providers, into: item.section, before: item.id)
         }
-        #endif
     }
 
     // MARK: Dra og slipp
@@ -406,21 +388,6 @@ struct NotchView: View {
             }
         }
         return true
-    }
-}
-
-// Hover som bare tegner denne delen på nytt, ikke hele lista.
-struct Hoverable<Content: View>: View {
-    var onChange: (Bool) -> Void = { _ in }
-    @ViewBuilder let content: (Bool) -> Content
-    @State private var hovered = false
-
-    var body: some View {
-        content(hovered).onHover { h in
-            guard h != hovered else { return }
-            hovered = h
-            onChange(h)
-        }
     }
 }
 

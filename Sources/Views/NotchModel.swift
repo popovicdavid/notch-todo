@@ -49,7 +49,6 @@ final class NotchModel: ObservableObject {
 
     // Ikke publisert: bare til tastaturet og dra og slipp, skal ikke tegne noe på nytt.
     var dragging: UUID?
-    var hoveredRow: UUID?  // til cmd+C; selve hover-visningen ligger i hver rad
     var fieldFocus: Section?
     var editingRow: UUID?
 

@@ -8,7 +8,7 @@ A small macOS app that shows your todo list in the notch. Hover over the notch f
 - Four sections: `## Viktig` (important), `## Frister` (deadlines), `## Generelle` (general) and `## Senere` (far ahead, kept out of the notch counters).
 - Deadlines and later tasks are sorted by the earliest date in each task (`frist 2026-11-01`, `innen 2026-11-01`, or any `YYYY-MM-DD`), and the date is shown as a chip (`i dag`, `i morgen`, `om 3 d`, `12. apr.`). The chip turns red when three days or less are left.
 - Never overwrites changes made elsewhere: before every save the file is read again and the change (check, add, edit, delete, move) is applied on top of what is there now. The Mac app, the iPhone widget and anything else that edits the file can be used side by side.
-- Checked tasks move to the bottom. Double-click a task to edit it, drag a task to move it within or between sections.
+- Checked tasks move to the bottom. Click a task to select it (move and delete buttons appear), double-click to edit it, drag a task to move it within or between sections.
 - `Senere` can be collapsed to a narrow strip (collapsed by default, remembered between launches).
 - The list size follows the screen it is on, and it is recalculated when displays are connected or disconnected.
 - Shows the clock in Norwegian time when you hover over the notch.
@@ -21,10 +21,10 @@ A small macOS app that shows your todo list in the notch. Hover over the notch f
 | Tab / Shift+Tab | Move between columns |
 | Space / Enter | Check or uncheck the selected task |
 | ⌘Z / ⇧⌘Z | Undo / redo (check, delete, edit, move, add) |
-| ⌘C | Copy the task under the mouse, or the selected one |
+| ⌘C | Copy the selected task (or the selected text) |
 | Esc | Close |
 
-Task text can be selected and copied. Right-click a task for "Kopier", and hover over a section title for "Kopier hele seksjonen" (copies the section as a markdown list).
+Click a task once, then drag over its text to select and copy part of it. Right-click a task for "Kopier", "Flytt til …", "Slett" and "Kopier hele seksjonen". The copy button next to each section title copies the section as a markdown list.
 
 ## Task file
 
