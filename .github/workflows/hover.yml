@@ -1,0 +1,57 @@
+name: Hover-skjermbilder (midlertidig)
+
+on: push
+
+permissions:
+  contents: write
+
+jobs:
+  hover:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Skjermbilder mens musa går over oppgavene
+        run: |
+          {
+            printf '# Todo\n'
+            for s in Viktig Frister Generelle Senere; do
+              printf '\n## %s\n\n' $s
+              for i in 1 2 3 4 5 6; do printf -- '- [ ] Oppgave %s nummer %d med en ganske lang tekst som bryter om, frist 2026-11-%02d\n' $s $i $i; done
+            done
+          } > ~/todo.md
+          mkdir -p build ~/logs
+          git show origin/main:main.swift > build/before.swift
+          F="-O -swift-version 5 -target arm64-apple-macos14"
+          swiftc $F build/before.swift -o build/gammel
+          S=$(find Sources -name '*.swift')
+          swiftc $F $S -o build/ny
+          swiftc $F -D NO_DND $S -o build/utenDnD
+          swiftc $F -D NO_MENU $S -o build/utenMeny
+          swiftc $F -D NO_HELP $S -o build/utenHelp
+          swiftc $F -D NO_DND -D NO_MENU -D NO_HELP $S -o build/utenAlle
+          swiftc .github/memtool/mouse.swift -o build/mouse
+          shot() { screencapture -x -R0,0,1024,330 ~/logs/$1-$2.png; }
+          run() {
+            "build/$1" &
+            pid=$!
+            sleep 5
+            build/mouse 512 5 click; sleep 2
+            build/mouse 200 300; sleep 1
+            build/mouse glide 200 80 150 500; shot $1 1a; sleep 0.6; shot $1 1b
+            build/mouse glide 200 150 230 500; shot $1 2a; sleep 0.6; shot $1 2b
+            build/mouse glide 200 230 110 700; shot $1 3a; sleep 0.6; shot $1 3b
+            build/mouse glide 450 110 200 500; shot $1 4a; sleep 0.6; shot $1 4b
+            kill $pid; sleep 2
+          }
+          for v in gammel ny utenDnD utenMeny utenHelp utenAlle; do run $v; done
+          ls ~/logs | head -60
+      - name: Legg bildene på en egen gren
+        if: always()
+        run: |
+          cd ~/logs
+          git init -q -b ci-logs
+          git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "bilder"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-logs

@@ -329,10 +329,14 @@ struct NotchView: View {
                 Button { store.move(item.id, to: item.section.other) } label: {
                     Image(systemName: "arrow.right").font(.system(size: 10))
                 }
+                #if !NO_HELP
                 .help("Flytt til \(item.section.other.rawValue)")
+                #endif
 
                 Button { store.remove(item.id) } label: { Image(systemName: "xmark").font(.system(size: 10)) }
+                #if !NO_HELP
                     .help("Slett")
+                #endif
             }
             .buttonStyle(.plain)
             .foregroundStyle(.white.opacity(0.5))
@@ -352,10 +356,13 @@ struct NotchView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { model.select(item.id) }
+        #if !NO_MENU
         .contextMenu {
             Button("Kopier") { Clipboard.copy(item.text) }
             Button("Kopier hele seksjonen") { copySection(item.section) }
         }
+        #endif
+        #if !NO_DND
         // Dra fra raden (utenfor selve teksten, som kan markeres). Andre apper får teksten.
         .onDrag {
             model.dragging = item.id
@@ -364,6 +371,7 @@ struct NotchView: View {
         .onDrop(of: [.plainText], isTargeted: dropBinding(.row(item.id))) { providers in
             drop(providers, into: item.section, before: item.id)
         }
+        #endif
     }
 
     // MARK: Dra og slipp
