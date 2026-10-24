@@ -12,7 +12,6 @@ struct NotchView: View {
     @State private var editingRow: UUID?
     @State private var editText = ""
     @FocusState private var editFocused: Bool
-    @State private var hoveredHeader: Section?
 
     private var notch: CGSize { model.geometry.notch }
 
@@ -198,6 +197,10 @@ struct NotchView: View {
     }
 
     private func header(_ section: Section) -> some View {
+        Hoverable { hovered in header(section, hovered: hovered) }
+    }
+
+    private func header(_ section: Section, hovered: Bool) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Text(section.rawValue).font(.system(size: 14, weight: .bold)).foregroundStyle(section.color)
             Text("\(store.openCount(in: section)) igjen").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
@@ -205,7 +208,7 @@ struct NotchView: View {
             Group {
                 Button { copySection(section) } label: { Image(systemName: "doc.on.doc") }
                     .help("Kopier hele seksjonen")
-                    .opacity(hoveredHeader == section ? 1 : 0)
+                    .opacity(hovered ? 1 : 0)
                 if section == .senere {
                     Button { model.laterCollapsed = true } label: { Image(systemName: "chevron.right.2") }
                         .help("Klapp sammen Senere")
@@ -216,9 +219,6 @@ struct NotchView: View {
             .foregroundStyle(.white.opacity(0.45))
         }
         .contentShape(Rectangle())
-        .onHover { h in
-            if h { hoveredHeader = section } else if hoveredHeader == section { hoveredHeader = nil }
-        }
         .contextMenu {
             Button("Kopier hele seksjonen") { copySection(section) }
         }
@@ -265,8 +265,15 @@ struct NotchView: View {
     }
 
     private func row(_ item: TodoItem) -> some View {
+        Hoverable { h in
+            if h { model.hoveredRow = item.id } else if model.hoveredRow == item.id { model.hoveredRow = nil }
+        } content: { hovered in
+            row(item, hovered: hovered)
+        }
+    }
+
+    private func row(_ item: TodoItem, hovered: Bool) -> some View {
         let color = item.section.color
-        let hovered = model.hoveredRow == item.id
         let chip = item.section.dated && !item.done ? dueChip(for: item.text) : nil
 
         return HStack(alignment: .top, spacing: 7) {
@@ -332,9 +339,6 @@ struct NotchView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { model.select(item.id) }
-        .onHover { h in
-            if h { model.hover(item.id) } else if model.hoveredRow == item.id { model.hover(nil) }
-        }
         .contextMenu {
             Button("Kopier") { Clipboard.copy(item.text) }
             Button("Kopier hele seksjonen") { copySection(item.section) }
@@ -381,6 +385,21 @@ struct NotchView: View {
             }
         }
         return true
+    }
+}
+
+// Hover som bare tegner denne delen på nytt, ikke hele lista.
+struct Hoverable<Content: View>: View {
+    var onChange: (Bool) -> Void = { _ in }
+    @ViewBuilder let content: (Bool) -> Content
+    @State private var hovered = false
+
+    var body: some View {
+        content(hovered).onHover { h in
+            guard h != hovered else { return }
+            hovered = h
+            onChange(h)
+        }
     }
 }
 

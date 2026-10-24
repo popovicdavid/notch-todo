@@ -44,12 +44,12 @@ final class NotchModel: ObservableObject {
     }
 
     @Published var selected: UUID?      // valgt med tastaturet eller et klikk
-    @Published var hoveredRow: UUID?
     @Published var dropTarget: DropSpot?
     @Published var focusRequest: Section?  // be visningen sette fokus på «Ny oppgave» i denne kolonnen
 
     // Ikke publisert: bare til tastaturet og dra og slipp, skal ikke tegne noe på nytt.
     var dragging: UUID?
+    var hoveredRow: UUID?  // til cmd+C; selve hover-visningen ligger i hver rad
     var fieldFocus: Section?
     var editingRow: UUID?
 
@@ -67,5 +67,4 @@ final class NotchModel: ObservableObject {
     var columns: [Section] { laterCollapsed ? [.viktig, .frister, .generelle] : Section.allCases }
 
     func select(_ id: UUID?) { if selected != id { selected = id } }
-    func hover(_ id: UUID?) { if hoveredRow != id { hoveredRow = id } }
 }

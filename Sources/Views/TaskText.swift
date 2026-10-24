@@ -90,13 +90,17 @@ struct TaskText: NSViewRepresentable {
         }
     }
 
+    // Målingen huskes til teksten eller bredden endres, så den ikke gjøres på nytt ved hver tegning.
     func sizeThatFits(_ proposal: ProposedViewSize, nsView v: TaskTextView, context: Context) -> CGSize? {
         guard let lm = v.layoutManager, let tc = v.textContainer else { return nil }
         let fixed = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        if let m = v.measured, m.width == fixed, m.key == v.shown { return m.size }
         tc.containerSize = NSSize(width: fixed ?? 10_000, height: .greatestFiniteMagnitude)
         lm.ensureLayout(for: tc)
         let used = lm.usedRect(for: tc)
-        return CGSize(width: fixed ?? ceil(used.width), height: max(ceil(used.height), 15))
+        let size = CGSize(width: fixed ?? ceil(used.width), height: max(ceil(used.height), 15))
+        v.measured = (fixed, v.shown, size)
+        return size
     }
 
     static func attributed(_ text: String, done: Bool) -> NSAttributedString {
@@ -127,6 +131,7 @@ final class TaskTextView: NSTextView {
     var onCopy: () -> Void = {}
     var onCopySection: () -> Void = {}
     var shown = ""
+    var measured: (width: CGFloat?, key: String, size: CGSize)?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 

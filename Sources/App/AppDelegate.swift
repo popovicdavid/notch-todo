@@ -94,16 +94,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.setFrame(panelFrame(), display: true)
     }
 
-    // Størrelsen på den svarte formen i tilstanden vi er i nå.
-    private var shapeSize: CGSize {
-        if model.open { return model.listSize }
-        if model.hovering { return model.geometry.hoverSize }
-        return model.geometry.notch
-    }
-
     // Panelet er bare så stort som tilstanden trenger (pluss plass til skyggen), ikke hele tiden 1160 × 660.
+    // Lukket og hover deler størrelse, så panelet ikke endrer størrelse hver gang musa går over notchen.
     private func panelFrame() -> NSRect {
-        let s = shapeSize
+        let s = model.open ? model.listSize : model.geometry.hoverSize
         let pad = model.open ? CGSize(width: 30, height: 40) : CGSize(width: 10, height: 10)
         return centered(CGSize(width: s.width + 2 * pad.width, height: s.height + pad.height))
     }
@@ -123,9 +117,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         shrink?.cancel()
         // Større: med en gang, så animasjonen har plass. Mindre: etter animasjonen, så den ikke kuttes.
         let grown = centered(CGSize(width: max(target.width, current.width), height: max(target.height, current.height)))
-        if grown != current { panel.setFrame(grown, display: true) }
+        if grown != current { panel.setFrame(grown, display: false) }
         if grown != target {
-            let work = DispatchWorkItem { [weak self] in self?.panel.setFrame(target, display: true) }
+            let work = DispatchWorkItem { [weak self] in self?.panel.setFrame(target, display: false) }
             shrink = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
         }
@@ -176,7 +170,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         model.large = false
         model.hovering = false
         model.select(nil)
-        model.hover(nil)
+        model.hoveredRow = nil
         // Slipp fokus, så tekstfeltene i lista ikke holdes i live mens den er lukket.
         panel.makeFirstResponder(nil)
         // Gi tastaturet tilbake til appen du var i.

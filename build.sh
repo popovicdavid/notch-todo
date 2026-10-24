@@ -29,7 +29,12 @@ codesign --force --sign - "$APP"
 
 mkdir -p ~/Applications
 pkill -x NotchTodo 2>/dev/null || true
+# Vent til den gamle har avsluttet (maks 3 s).
+for i in {1..30}; do pgrep -x NotchTodo >/dev/null || break; sleep 0.1; done
 rm -rf ~/Applications/NotchTodo.app
 cp -R "$APP" ~/Applications/
-open ~/Applications/NotchTodo.app
+# LaunchAgent-en kan ha startet den gamle på nytt i mellomtiden.
+pkill -x NotchTodo 2>/dev/null || true
+sleep 0.5
+open ~/Applications/NotchTodo.app 2>/dev/null || { sleep 1; open ~/Applications/NotchTodo.app; }
 echo "NotchTodo kjører."
