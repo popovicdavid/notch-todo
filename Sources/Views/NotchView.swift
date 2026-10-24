@@ -24,21 +24,29 @@ struct NotchView: View {
 
     private var radius: CGFloat { model.open ? 24 : 10 }
 
+    private var shape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius, style: .continuous)
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
-            UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius, style: .continuous)
+            shape
                 .fill(Color.black)
                 .frame(width: size.width, height: size.height)
                 .shadow(color: .black.opacity(model.open ? 0.45 : 0), radius: 14, y: 6)
 
             // Klokka og innholdet finnes bare når de vises, så ingenting tegnes eller oppdateres når lista er lukket.
+            // Lista forsvinner med en gang den lukkes: tekstvisningene (AppKit) blir ikke med på en uttoning,
+            // og ville ellers hengt igjen i notchen mens formen krymper. Alt klippes også til formen.
             if model.open {
                 openContent
                     .frame(width: size.width, height: size.height)
-                    .transition(.opacity)
+                    .clipShape(shape)
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
             } else if model.hovering {
                 hoverContent
                     .frame(width: size.width, height: size.height)
+                    .clipShape(shape)
                     .transition(.opacity)
             }
         }
