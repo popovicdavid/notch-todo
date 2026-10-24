@@ -7,7 +7,7 @@ APP=build/NotchTodo.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 
-swiftc -O -swift-version 5 -target arm64-apple-macos14 main.swift -o "$APP/Contents/MacOS/NotchTodo"
+swiftc -O -swift-version 5 -target arm64-apple-macos14 Sources/**/*.swift -o "$APP/Contents/MacOS/NotchTodo"
 
 cat > "$APP/Contents/Info.plist" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,7 +29,12 @@ codesign --force --sign - "$APP"
 
 mkdir -p ~/Applications
 pkill -x NotchTodo 2>/dev/null || true
+# Vent til den gamle har avsluttet (maks 3 s).
+for i in {1..30}; do pgrep -x NotchTodo >/dev/null || break; sleep 0.1; done
 rm -rf ~/Applications/NotchTodo.app
 cp -R "$APP" ~/Applications/
-open ~/Applications/NotchTodo.app
+# LaunchAgent-en kan ha startet den gamle på nytt i mellomtiden.
+pkill -x NotchTodo 2>/dev/null || true
+sleep 0.5
+open ~/Applications/NotchTodo.app 2>/dev/null || { sleep 1; open ~/Applications/NotchTodo.app; }
 echo "NotchTodo kjører."

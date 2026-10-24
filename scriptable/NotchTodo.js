@@ -15,7 +15,7 @@ const NAMES = ["Viktig", "Frister", "Generelle", "Senere"]
 const WIDGET_NAMES = ["Viktig", "Frister", "Generelle"]
 const DATED = ["Frister", "Senere"]
 const COLORS = { Viktig: "#FF9F0A", Frister: "#FF375F", Generelle: "#64D2FF", Senere: "#BF5AF2" }
-const MONTHS = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"]
+const MONTHS = ["jan.", "feb.", "mar.", "apr.", "mai", "jun.", "jul.", "aug.", "sep.", "okt.", "nov.", "des."]
 
 // ---------- Fil ----------
 // Leser fra iCloud (laster ned ved behov). Siste vellykkede lesing lagres lokalt som reserve.
@@ -38,37 +38,68 @@ async function readTodo() {
 
 let todoText = await readTodo()
 
-function load() {
-  const items = []
-  let sec = "Viktig"
-  for (const l of (todoText || "").split("\n")) {
-    const t = l.trim()
-    if (t.startsWith("## ")) {
-      const n = t.slice(3).trim().toLowerCase()
-      sec = n.startsWith("generell") ? "Generelle" : n.startsWith("frist") ? "Frister" : n.startsWith("senere") ? "Senere" : "Viktig"
-    } else if (/^- \[[ xX]\] /.test(t)) {
-      items.push({ text: t.slice(6), done: t[3] !== " ", section: sec })
-    }
-  }
-  return items
+// ---------- Fila ----------
+// Samme regler som Mac-appen (Sources/Model/TodoFile.swift): seksjonsrekkefølgen, tittelen og notater i fila tas vare på,
+// og hver endring legges oppå fila slik den er rett før lagring, så endringer fra Mac-en eller assistenten ikke overskrives.
+
+function sectionOf(heading) {
+  const n = heading.trim().toLowerCase()
+  return n.startsWith("generell") ? "Generelle" : n.startsWith("frist") ? "Frister" : n.startsWith("senere") ? "Senere" : "Viktig"
 }
 
-// Datoen etter «frist»/«innen», ellers første dato i teksten. Samme regel som Mac-appen:
+function parseDoc(text) {
+  const doc = { preamble: [], order: [], items: [], notes: {} }
+  let sec = "Viktig"
+  let inSec = false
+  for (const l of (text || "").split(/\r?\n/)) {
+    const t = l.trim()
+    if (t.startsWith("## ")) {
+      sec = sectionOf(t.slice(3))
+      inSec = true
+      if (!doc.order.includes(sec)) doc.order.push(sec)
+    } else if (/^- \[[ xX]\] /.test(t)) {
+      doc.items.push({ text: t.slice(6), done: t[3] !== " ", section: sec })
+    } else if (t) {
+      if (inSec) (doc.notes[sec] = doc.notes[sec] || []).push(t)
+      else doc.preamble.push(t)
+    }
+  }
+  if (!doc.preamble.length) doc.preamble = ["# Todo"]
+  return doc
+}
+
+function serializeDoc(doc) {
+  let out = doc.preamble.join("\n") + "\n"
+  for (const s of doc.order.concat(NAMES.filter(n => !doc.order.includes(n)))) {
+    out += `\n## ${s}\n\n`
+    const list = ordered(doc.items, s)
+    for (const i of list) out += `- [${i.done ? "x" : " "}] ${i.text}\n`
+    const notes = doc.notes[s] || []
+    if (notes.length) out += (list.length ? "\n" : "") + notes.join("\n") + "\n"
+  }
+  return out
+}
+
+function load() { return parseDoc(todoText).items }
+
+// Datoen etter «frist»/«innen», ellers første dato i teksten. Samme regel som findDate() i Mac-appen:
 // 2026-12-01 eller 1. des (eventuelt 1. des 2027). Uten år gjelder i år, eller neste år hvis datoen var for mer enn 30 dager siden.
-// Gir { iso: "YYYY-MM-DD", text: teksten som ble funnet } eller null.
+// Gir { iso: "YYYY-MM-DD", text: teksten som ble funnet, marked: tas bort fra teksten i Frister og Senere } eller null.
 function findDate(t) {
   const D = String.raw`(\d{4})-(\d{2})-(\d{2})|\b(\d{1,2})\.\s*(jan|feb|mar|apr|mai|jun|jul|aug|sep|okt|nov|des)[a-zæøå]*(?:\s+(\d{4}))?`
-  const m = t.match(new RegExp(String.raw`(?:frist|innen)\s+(?:ca\.\s*)?(?:${D})`, "i")) || t.match(new RegExp(D, "i"))
+  const withWord = t.match(new RegExp(String.raw`(?:frist|innen)\s+(?:ca\.\s*)?(?:${D})`, "i"))
+  const m = withWord || t.match(new RegExp(D, "i"))
   if (!m) return null
   const p = n => String(n).padStart(2, "0")
-  if (m[1]) return { iso: `${m[1]}-${m[2]}-${m[3]}`, text: m[0] }
+  if (m[1]) return { iso: `${m[1]}-${m[2]}-${m[3]}`, text: m[0], marked: !!withWord }
   const mo = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"].indexOf(m[5].toLowerCase())
   const now = new Date()
   let y = m[6] ? +m[6] : now.getFullYear()
   if (!m[6] && new Date(y, mo, +m[4]) < new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30)) y++
-  return { iso: `${y}-${p(mo + 1)}-${p(+m[4])}`, text: m[0] }
+  return { iso: `${y}-${p(mo + 1)}-${p(+m[4])}`, text: m[0], marked: true }
 }
-const dl = t => (findDate(t) || {}).iso || "9999"
+
+function dl(t) { return (findDate(t) || {}).iso || "9999" }
 
 function ordered(items, sec) {
   const all = items.filter(i => i.section === sec)
@@ -78,23 +109,81 @@ function ordered(items, sec) {
 }
 const openIn = (items, sec) => ordered(items, sec).filter(i => !i.done)
 
-function save(items) {
-  let out = "# Todo\n"
-  for (const s of NAMES) {
-    out += `\n## ${s}\n\n`
-    for (const i of ordered(items, s)) out += `- [${i.done ? "x" : " "}] ${i.text}\n`
+// En endring peker på oppgaven med seksjon, tekst, status og n (hvilken av like oppgaver), ikke med plassen i lista.
+// Da finnes den igjen selv om fila er endret et annet sted i mellomtiden.
+function sameTask(a, b) { return a.section === b.section && a.text === b.text && a.done === b.done }
+
+function refAt(items, i) {
+  const it = items[i]
+  return { section: it.section, text: it.text, done: it.done, n: items.slice(0, i).filter(o => sameTask(o, it)).length }
+}
+
+function locate(items, r) {
+  if (!r) return -1
+  const exact = []
+  items.forEach((it, i) => { if (sameTask(it, r)) exact.push(i) })
+  if (exact.length) return exact[Math.min(r.n, exact.length - 1)]
+  let i = items.findIndex(it => it.section === r.section && it.text === r.text)
+  if (i < 0) i = items.findIndex(it => it.text === r.text && it.done === r.done)
+  if (i < 0) i = items.findIndex(it => it.text === r.text)
+  return i
+}
+
+function insertIndex(items, before, sec) {
+  const j = locate(items, before)
+  return j >= 0 && items[j].section === sec ? j : items.length
+}
+
+function oneLine(t) { return String(t).replace(/\s*\n\s*/g, " ").trim() }
+
+// Endringene: insert, setDone, edit, remove, move og batch. «before» er oppgaven den nye plassen er rett foran (null = nederst).
+function applyOp(items, op) {
+  if (op.op === "insert") {
+    const text = oneLine(op.text)
+    if (text) items.splice(insertIndex(items, op.before, op.section), 0, { text, done: !!op.done, section: op.section })
+  } else if (op.op === "setDone") {
+    const i = locate(items, op.ref)
+    if (i < 0 || items[i].done === op.done) return
+    const it = items.splice(i, 1)[0]
+    it.done = op.done
+    items.splice(insertIndex(items, op.before, it.section), 0, it)
+  } else if (op.op === "edit") {
+    const text = oneLine(op.text)
+    const i = locate(items, op.ref)
+    if (text && i >= 0) items[i].text = text
+  } else if (op.op === "remove") {
+    const i = locate(items, op.ref)
+    if (i >= 0) items.splice(i, 1)
+  } else if (op.op === "move") {
+    const i = locate(items, op.ref)
+    if (i < 0) return
+    const it = items.splice(i, 1)[0]
+    it.section = op.section
+    items.splice(insertIndex(items, op.before, op.section), 0, it)
+  } else if (op.op === "batch") {
+    for (const o of op.ops) applyOp(items, o)
   }
-  fm.writeString(PATH, out)
+}
+
+// Leser fila på nytt rett før lagring og legger endringene oppå.
+async function saveOps(ops) {
+  const fresh = await readTodo()
+  const doc = parseDoc(fresh != null && fresh.trim() ? fresh : todoText)
+  for (const op of ops) applyOp(doc.items, op)
+  const out = serializeDoc(doc)
+  if (out !== fresh) {
+    fm.writeString(PATH, out)
+    try { local.writeString(CACHE, out) } catch (e) {}
+  }
   todoText = out
-  try { local.writeString(CACHE, out) } catch (e) {}
 }
 
 // ---------- Visning ----------
-// Fjerner markdown og (i Frister og Senere) selve datoen, som vises som en egen brikke.
+// Fjerner markdown og (i Frister og Senere) «frist …» og korte datoer, som vises som en egen brikke.
 function clean(t, sec) {
   let s = t.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\*\*|__|`/g, "")
   const f = DATED.includes(sec) ? findDate(s) : null
-  if (f) {
+  if (f && f.marked) {
     const i = s.indexOf(f.text)
     s = (s.slice(0, i).replace(/,?\s*$/, "") + " " + s.slice(i + f.text.length))
       .replace(/\(\s*\)/g, "").replace(/\(\s*,?\s*/g, "(").replace(/,?\s*\)/g, ")")
@@ -114,7 +203,7 @@ function due(text) {
   else if (days === 0) label = "i dag"
   else if (days === 1) label = "i morgen"
   else if (days <= 7) label = `om ${days} d`
-  else label = `${dd}. ${MONTHS[m - 1]}` + (y !== today.getFullYear() ? ` ’${String(y).slice(2)}` : "")
+  else label = `${dd}. ${MONTHS[m - 1]}` + (y !== today.getFullYear() ? ` ${y}` : "")
   return { label, urgent: days <= 3 }
 }
 
@@ -363,20 +452,31 @@ textarea.edit { width: 100%; resize: none; border: 0; outline: none; margin: -4p
 .add input::placeholder { color: rgba(255,255,255,.35); }
 `
 
-// Kjøres inne i siden. Bruker NAMES, COLORS, dl, due, clean og ordered, som legges inn i siden fra dette scriptet.
+// Kjøres inne i siden. Bruker NAMES, COLORS, dl, due, clean, ordered og applyOp, som legges inn i siden fra dette scriptet.
 function pageMain(DATA, DATE) {
   let items = DATA
   let editing = null
   let busy = false
-  let dirty = false
+  let queue = []
 
-  // Scriptable spør jevnlig etter endringer med takeChanges().
+  // Scriptable spør jevnlig etter endringer med takeChanges() og legger dem oppå fila.
   window.takeChanges = () => {
-    if (!dirty) return ""
-    dirty = false
-    return JSON.stringify(items)
+    if (!queue.length) return ""
+    const out = JSON.stringify(queue)
+    queue = []
+    return out
   }
-  const push = () => { dirty = true }
+  // Fila slik den er etter lagring, med endringer fra Mac-en. Vent hvis noe er på vei eller redigeres.
+  window.sync = fresh => {
+    if (queue.length || editing || busy) return false
+    if (JSON.stringify(fresh) !== JSON.stringify(items)) {
+      items = fresh
+      renderAll()
+    }
+    return true
+  }
+  const act = op => { applyOp(items, op); queue.push(op) }
+  const ref = it => refAt(items, items.indexOf(it))
   const esc = s => s.replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]))
 
   document.body.innerHTML = `
@@ -433,26 +533,26 @@ function pageMain(DATA, DATE) {
   function takeEditText() {
     const ta = document.querySelector("textarea.edit")
     if (!ta || !editing) return false
-    const v = ta.value.replace(/\s*\n\s*/g, " ").trim()
-    if (v && v !== editing.text) { editing.text = v; return true }
+    const v = oneLine(ta.value)
+    if (v && v !== editing.text) { act({ op: "edit", ref: ref(editing), text: v }); return true }
     return false
   }
 
   function commitEdit() {
     if (!editing) return
-    const changed = takeEditText()
+    takeEditText()
     editing = null
     renderAll()
-    if (changed) push()
   }
 
   document.addEventListener("click", e => {
     if (busy) return
     if (e.target.closest("#clear")) {
-      items = items.filter(i => !i.done)
+      const refs = []
+      for (let i = items.length - 1; i >= 0; i--) if (items[i].done) refs.push(refAt(items, i))
+      act({ op: "batch", ops: refs.map(r => ({ op: "remove", ref: r })) })
       editing = null
       renderAll()
-      push()
       return
     }
     const li = e.target.closest("li[data-k]")
@@ -461,23 +561,18 @@ function pageMain(DATA, DATE) {
     const move = e.target.closest("[data-move]")
     if (move) {
       takeEditText()
-      it.section = move.dataset.move
+      act({ op: "move", ref: ref(it), section: move.dataset.move, before: null })
       editing = null
       renderAll()
-      push()
     } else if (e.target.closest(".del")) {
-      items.splice(items.indexOf(it), 1)
+      act({ op: "remove", ref: ref(it) })
       editing = null
       renderAll()
-      push()
     } else if (e.target.closest(".chk")) {
       const changed = takeEditText()
       editing = null
-      it.done = !it.done
-      items.splice(items.indexOf(it), 1)
-      items.push(it)
+      act({ op: "setDone", ref: ref(it), done: !it.done, before: null })
       li.classList.toggle("done", it.done)
-      push()
       busy = true
       setTimeout(() => { busy = false; renderAll() }, changed ? 0 : 380)
     } else if (e.target.closest(".txt")) {
@@ -509,14 +604,14 @@ function pageMain(DATA, DATE) {
     if (date && date.value) {
       // Kort form som (1. des), med år bare når året ellers ville blitt feil.
       const [y, m, d] = date.value.split("-").map(Number)
-      const short = `${d}. ${MONTHS[m - 1]}`
+      const short = `${d}. ${MONTHS[m - 1].replace(".", "")}`
       text += findDate(short).iso === date.value ? ` (${short})` : ` (${short} ${y})`
     }
-    items.push({ text, done: false, section: sec })
+    act({ op: "insert", text, done: false, section: sec, before: null })
     input.value = ""
     if (date) date.value = ""
     renderList(sec)
-    push()
+    document.getElementById("clear").hidden = !items.some(i => i.done)
     input.focus()
   })
 
@@ -544,10 +639,16 @@ const DATED = ${json(DATED)};
 const COLORS = ${json(COLORS)};
 const MONTHS = ${json(MONTHS)};
 ${findDate}
-const dl = ${dl};
+${dl}
 ${due}
 ${clean}
 ${ordered}
+${sameTask}
+${refAt}
+${locate}
+${insertIndex}
+${oneLine}
+${applyOp}
 (${pageMain})(${json(items)}, ${json(df.string(new Date()))});
 </script></body></html>`
 }
@@ -557,11 +658,28 @@ async function openApp() {
   await wv.loadHTML(pageHTML(load()))
   let closed = false
   const shown = wv.present(true).then(() => { closed = true })
+  let tick = 0
+  let pending = false  // siden har ikke fått siste utgave av fila ennå
   const flush = async () => {
+    let ops = []
     try {
       const r = await wv.evaluateJavaScript("window.takeChanges ? takeChanges() : ''")
-      if (r) save(JSON.parse(r))
+      if (r) ops = JSON.parse(r)
     } catch (e) {}
+    if (ops.length) {
+      await saveOps(ops)
+      pending = true
+    } else if (++tick % 5 === 0) {
+      // Omtrent hvert andre sekund: se etter endringer fra Mac-en eller assistenten.
+      const fresh = await readTodo()
+      if (fresh != null && fresh !== todoText) { todoText = fresh; pending = true }
+    }
+    if (pending && !closed) {
+      try {
+        const ok = await wv.evaluateJavaScript(`window.sync ? sync(${JSON.stringify(load())}) : false`)
+        if (ok) pending = false
+      } catch (e) {}
+    }
   }
   while (!closed) {
     await new Promise(r => Timer.schedule(400, false, r))
