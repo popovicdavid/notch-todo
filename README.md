@@ -6,7 +6,7 @@ A small macOS app that shows your todo list in the notch. Hover over the notch f
 
 - Reads tasks from a plain markdown file and reloads automatically when the file changes.
 - Four sections: `## Viktig` (important), `## Frister` (deadlines), `## Generelle` (general) and `## Senere` (far ahead, kept out of the notch counters).
-- Deadlines and later tasks are sorted by the earliest date in each task (`frist 2026-11-01`, `innen 2026-11-01`, or any `YYYY-MM-DD`).
+- Deadlines and later tasks are sorted by date: the one after `frist`/`innen`, otherwise the first in the task. Dates can be `2026-11-01` or short Norwegian `1. nov` (this year, or next year if more than 30 days ago; `1. nov 2027` sets the year).
 - Checked tasks move to the bottom. Double-click a task to edit it. A button moves a task to the next section.
 - Shows the clock in Norwegian time when you hover over the notch.
 
@@ -19,13 +19,13 @@ A small macOS app that shows your todo list in the notch. Hover over the notch f
 - [ ] Reply to the email
 
 ## Frister
-- [ ] Hand in the report, frist 2026-11-01
+- [ ] Hand in the report (1. nov)
 
 ## Generelle
 - [ ] Go through the weekly notes
 
 ## Senere
-- [ ] Apply for next summer, frist 2027-04-01
+- [ ] Apply for next summer (1. apr)
 ```
 
 ## Setup

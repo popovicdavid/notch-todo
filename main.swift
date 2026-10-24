@@ -30,13 +30,28 @@ enum Section: String, CaseIterable {
     }
 }
 
-// Datoen (YYYY-MM-DD) etter «frist» eller «innen» i teksten, ellers første dato. Brukes til å sortere Frister.
+let monthNames = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"]
+// 2026-12-01, eller kort norsk form: 1. des (eventuelt med år: 1. des 2027).
+let datePattern = #"(\d{4})-(\d{2})-(\d{2})|\b(\d{1,2})\.\s*(jan|feb|mar|apr|mai|jun|jul|aug|sep|okt|nov|des)[a-zæøå]*(?:\s+(\d{4}))?"#
+
+// Datoen (som YYYY-MM-DD) etter «frist» eller «innen» i teksten, ellers første dato. Brukes til å sortere Frister og Senere.
+// Uten år gjelder i år, eller neste år hvis datoen var for mer enn 30 dager siden.
 func deadline(in text: String) -> String? {
-    for pattern in [#"(?:frist|innen)\s+(?:ca\.\s*)?(\d{4}-\d{2}-\d{2})"#, #"(\d{4}-\d{2}-\d{2})"#] {
-        if let r = text.range(of: pattern, options: [.regularExpression, .caseInsensitive]),
-           let d = text[r].range(of: #"\d{4}-\d{2}-\d{2}"#, options: .regularExpression) {
-            return String(text[r][d])
+    let ns = text as NSString
+    for pattern in [#"(?:frist|innen)\s+(?:ca\.\s*)?(?:"# + datePattern + ")", datePattern] {
+        guard let re = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let m = re.firstMatch(in: text, range: NSRange(location: 0, length: ns.length)) else { continue }
+        let g = { (i: Int) -> String? in m.range(at: i).location == NSNotFound ? nil : ns.substring(with: m.range(at: i)) }
+        if let y = g(1), let mo = g(2), let d = g(3) { return "\(y)-\(mo)-\(d)" }
+        guard let d = g(4).flatMap({ Int($0) }), let mo = g(5).flatMap({ monthNames.firstIndex(of: $0.lowercased()) })
+        else { return nil }
+        let cal = Calendar.current
+        var year = g(6).flatMap { Int($0) } ?? cal.component(.year, from: Date())
+        if g(6) == nil, let date = cal.date(from: DateComponents(year: year, month: mo + 1, day: d)),
+           let limit = cal.date(byAdding: .day, value: -30, to: cal.startOfDay(for: Date())), date < limit {
+            year += 1
         }
+        return String(format: "%04d-%02d-%02d", year, mo + 1, d)
     }
     return nil
 }

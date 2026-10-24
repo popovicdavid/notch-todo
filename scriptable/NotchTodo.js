@@ -53,9 +53,22 @@ function load() {
   return items
 }
 
-// Datoen etter «frist»/«innen», ellers første dato i teksten. Samme regel som Mac-appen.
-const dl = t =>
-  ((t.match(/(?:frist|innen)\s+(?:ca\.\s*)?(\d{4}-\d{2}-\d{2})/i) || t.match(/(\d{4}-\d{2}-\d{2})/) || [])[1] || "9999")
+// Datoen etter «frist»/«innen», ellers første dato i teksten. Samme regel som Mac-appen:
+// 2026-12-01 eller 1. des (eventuelt 1. des 2027). Uten år gjelder i år, eller neste år hvis datoen var for mer enn 30 dager siden.
+// Gir { iso: "YYYY-MM-DD", text: teksten som ble funnet } eller null.
+function findDate(t) {
+  const D = String.raw`(\d{4})-(\d{2})-(\d{2})|\b(\d{1,2})\.\s*(jan|feb|mar|apr|mai|jun|jul|aug|sep|okt|nov|des)[a-zæøå]*(?:\s+(\d{4}))?`
+  const m = t.match(new RegExp(String.raw`(?:frist|innen)\s+(?:ca\.\s*)?(?:${D})`, "i")) || t.match(new RegExp(D, "i"))
+  if (!m) return null
+  const p = n => String(n).padStart(2, "0")
+  if (m[1]) return { iso: `${m[1]}-${m[2]}-${m[3]}`, text: m[0] }
+  const mo = ["jan", "feb", "mar", "apr", "mai", "jun", "jul", "aug", "sep", "okt", "nov", "des"].indexOf(m[5].toLowerCase())
+  const now = new Date()
+  let y = m[6] ? +m[6] : now.getFullYear()
+  if (!m[6] && new Date(y, mo, +m[4]) < new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30)) y++
+  return { iso: `${y}-${p(mo + 1)}-${p(+m[4])}`, text: m[0] }
+}
+const dl = t => (findDate(t) || {}).iso || "9999"
 
 function ordered(items, sec) {
   const all = items.filter(i => i.section === sec)
@@ -80,9 +93,11 @@ function save(items) {
 // Fjerner markdown og (i Frister og Senere) selve datoen, som vises som en egen brikke.
 function clean(t, sec) {
   let s = t.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/\*\*|__|`/g, "")
-  if (DATED.includes(sec)) {
-    s = s.replace(/,?\s*(?:frist|innen)\s+(?:ca\.\s*)?\d{4}-\d{2}-\d{2}/i, "")
-      .replace(/\(\s*\)/g, "").replace(/\(\s*,\s*/g, "(").replace(/,\s*\)/g, ")")
+  const f = DATED.includes(sec) ? findDate(s) : null
+  if (f) {
+    const i = s.indexOf(f.text)
+    s = (s.slice(0, i).replace(/,?\s*$/, "") + " " + s.slice(i + f.text.length))
+      .replace(/\(\s*\)/g, "").replace(/\(\s*,?\s*/g, "(").replace(/,?\s*\)/g, ")")
   }
   return s.replace(/\s{2,}/g, " ").trim()
 }
@@ -491,7 +506,12 @@ function pageMain(DATA, DATE) {
     const date = f.querySelector("input[type=date]")
     let text = input.value.trim()
     if (!text) return
-    if (date && date.value) text += ` (frist ${date.value})`
+    if (date && date.value) {
+      // Kort form som (1. des), med år bare når året ellers ville blitt feil.
+      const [y, m, d] = date.value.split("-").map(Number)
+      const short = `${d}. ${MONTHS[m - 1]}`
+      text += findDate(short).iso === date.value ? ` (${short})` : ` (${short} ${y})`
+    }
     items.push({ text, done: false, section: sec })
     input.value = ""
     if (date) date.value = ""
@@ -523,6 +543,7 @@ const NAMES = ${json(NAMES)};
 const DATED = ${json(DATED)};
 const COLORS = ${json(COLORS)};
 const MONTHS = ${json(MONTHS)};
+${findDate}
 const dl = ${dl};
 ${due}
 ${clean}
