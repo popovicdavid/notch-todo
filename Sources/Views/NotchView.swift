@@ -322,19 +322,22 @@ struct NotchView: View {
                 if let chip { DueChipView(chip: chip, color: color) }
             }
 
-            if hovered && editingRow != item.id {
+            // Knappene har alltid sin plass og vises bare ved hover. Før tok de plass fra teksten når de dukket opp,
+            // så teksten brøt om, raden endret høyde og alt under hoppet (det føltes som hakking og forsinkelse).
+            let showButtons = hovered && editingRow != item.id
+            HStack(spacing: 7) {
                 Button { store.move(item.id, to: item.section.other) } label: {
                     Image(systemName: "arrow.right").font(.system(size: 10))
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white.opacity(0.5))
                 .help("Flytt til \(item.section.other.rawValue)")
 
                 Button { store.remove(item.id) } label: { Image(systemName: "xmark").font(.system(size: 10)) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white.opacity(0.5))
                     .help("Slett")
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(.white.opacity(0.5))
+            .opacity(showButtons ? 1 : 0)
+            .allowsHitTesting(showButtons)
         }
         .padding(.horizontal, 4)
         .padding(.vertical, 2)
