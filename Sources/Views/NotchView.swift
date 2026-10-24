@@ -196,7 +196,7 @@ struct NotchView: View {
     }
 
     private func header(_ section: Section) -> some View {
-        Hoverable { hovered in header(section, hovered: hovered) }
+        Hoverable { hovered, _ in header(section, hovered: hovered) }
     }
 
     private func header(_ section: Section, hovered: Bool) -> some View {
@@ -264,14 +264,15 @@ struct NotchView: View {
     }
 
     private func row(_ item: TodoItem) -> some View {
-        Hoverable { h in
+        Hoverable(settleDelay: 0.35) { h in
             if h { model.hoveredRow = item.id } else if model.hoveredRow == item.id { model.hoveredRow = nil }
-        } content: { hovered in
-            row(item, hovered: hovered)
+        } content: { hovered, settled in
+            row(item, hovered: hovered, settled: settled)
         }
     }
 
-    private func row(_ item: TodoItem, hovered: Bool) -> some View {
+    // settled: musa har stått i ro over raden en liten stund.
+    private func row(_ item: TodoItem, hovered: Bool, settled: Bool) -> some View {
         let color = item.section.color
         let chip = item.section.dated && !item.done ? dueChip(for: item.text) : nil
 
@@ -298,16 +299,18 @@ struct NotchView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                // Vanlig SwiftUI-tekst, som før. Raden musa er over (eller som er valgt) får i tillegg en markerbar
-                // tekstvisning oppå, så teksten kan markeres og kopieres uten at hver rad må ha en (det gjorde lista treg).
+                // Vanlig SwiftUI-tekst, som før. Raden musa hviler over (eller som er valgt) får i tillegg en markerbar
+                // tekstvisning oppå, så teksten kan markeres og kopieres. Den lages først når musa har stoppet,
+                // ellers ble det hakkete å dra musa over lista (en ny tekstvisning for hver rad).
                 let shown = displayText(item.text, in: item.section)
-                let selectable = hovered || model.selected == item.id
+                let selectable = settled || model.selected == item.id
                 Text(LocalizedStringKey(shown))
                     .font(.system(size: 12.5))
                     .strikethrough(item.done)
                     .foregroundStyle(item.done ? Color.white.opacity(0.4) : Color.white)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .opacity(selectable ? 0 : 1)
+                    .onTapGesture(count: 2) { beginEditing(item) }
                     .overlay(alignment: .topLeading) {
                         if selectable {
                             TaskText(
@@ -401,16 +404,29 @@ struct NotchView: View {
 }
 
 // Hover som bare tegner denne delen på nytt, ikke hele lista.
+// settled blir sann når musa har vært over i settleDelay sekunder.
 struct Hoverable<Content: View>: View {
+    var settleDelay: TimeInterval?
     var onChange: (Bool) -> Void = { _ in }
-    @ViewBuilder let content: (Bool) -> Content
+    @ViewBuilder let content: (_ hovered: Bool, _ settled: Bool) -> Content
     @State private var hovered = false
+    @State private var settled = false
+    @State private var pending: DispatchWorkItem?
 
     var body: some View {
-        content(hovered).onHover { h in
+        content(hovered, settled).onHover { h in
             guard h != hovered else { return }
             hovered = h
             onChange(h)
+            pending?.cancel()
+            pending = nil
+            if h, let delay = settleDelay {
+                let work = DispatchWorkItem { settled = true }
+                pending = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+            } else if settled {
+                settled = false
+            }
         }
     }
 }
